@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Texting Inbox — Interactive Spec · Accelerated Academy</title>
+<style>
+  :root{
+    --bg:#f3f4f7; --panel:#fff; --ink:#1a1a22; --muted:#62667a; --line:#e4e6ee;
+    --brand:#0b5cab; --brand-soft:#e9f1fb; --brand-ink:#0a4684;
+    --teal:#14b8cb; --teal-dark:#0e94a4; --teal-soft:#e3f7fa;
+    --amber:#b45309; --amber-soft:#fef3c7; --green:#0f7a4d; --green-soft:#e3f5ec;
+    --slate:#475569; --slate-soft:#eef1f6; --note:#fff8e1; --note-line:#e7c948;
+    --bub-in:#f1f3f7; --bub-out:#e8f2fc;
+    --radius:12px; --shadow:0 1px 2px rgba(20,24,40,.06),0 4px 14px rgba(20,24,40,.05);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:1340px;margin:0 auto;padding:0 18px 60px}
+
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.9);backdrop-filter:saturate(1.6) blur(8px);border-bottom:1px solid var(--line)}
+  .topbar .inner{max-width:1340px;margin:0 auto;padding:11px 18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .brand{font-weight:700;font-size:17px;display:flex;align-items:center;gap:9px}
+  .brand .dot{width:26px;height:26px;border-radius:8px;background:var(--teal);color:#fff;display:grid;place-items:center;font-size:14px}
+  .spec-tag{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--teal-dark);background:var(--teal-soft);padding:3px 8px;border-radius:999px}
+  .controls{margin-left:auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .field{display:flex;align-items:center;gap:7px}
+  .field label{font-size:12px;color:var(--muted);font-weight:600}
+  select{font:inherit;padding:7px 30px 7px 11px;border:1px solid var(--line);border-radius:9px;background:#fff
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2362667a' stroke-width='1.6' fill='none'/%3E%3C/svg%3E") no-repeat right 11px center;-webkit-appearance:none;appearance:none;cursor:pointer}
+  .toggle{font:inherit;font-size:13px;border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 11px;cursor:pointer;display:flex;align-items:center;gap:7px}
+  .toggle .sw{width:30px;height:18px;border-radius:999px;background:#cfd3e0;position:relative;transition:.15s}
+  .toggle .sw::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:.15s}
+  .toggle.on .sw{background:var(--teal)}
+  .toggle.on .sw::after{left:14px}
+
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:18px 0 0}
+  .tabs>button{font:inherit;font-weight:600;font-size:14px;color:var(--muted);background:none;border:none;padding:11px 14px;cursor:pointer;border-bottom:2.5px solid transparent;margin-bottom:-1px}
+  .tabs>button.active{color:var(--brand-ink);border-bottom-color:var(--teal)}
+
+  .footer{margin-top:28px;color:var(--muted);font-size:12.5px;text-align:center}
+
+  /* Chips / badges */
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;line-height:1.3;white-space:nowrap}
+  .badge{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;background:#eef0f6;color:#4a4f63;white-space:nowrap}
+
+  .note{background:var(--note);border:1.5px dashed var(--note-line);border-radius:10px;padding:11px 14px;font-size:13px;color:#5b4a00;margin:14px 0;display:flex;gap:10px;align-items:flex-start}
+  .note.sm{font-size:12px;padding:9px 11px;margin:10px 0 0}
+  .note b{color:#3d3200}
+  .note .tag{font-size:10px;font-weight:800;letter-spacing:.06em;background:var(--note-line);color:#3d3200;padding:2px 6px;border-radius:5px;flex:none;margin-top:1px}
+
+  .flash{background:var(--green-soft);border:1px solid #b7e3cd;color:var(--green);border-radius:10px;padding:9px 13px;font-size:13px;font-weight:600;margin:14px 0 0;display:flex;gap:8px;align-items:center}
+
+  /* INBOX three-pane workspace */
+  .ws-meta{display:flex;align-items:center;gap:10px;margin-top:16px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+  .ws-meta .avatar{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:700;color:#fff;font-size:12px}
+  .ws-meta b{color:var(--ink)}
+  .shell{display:grid;grid-template-columns:212px 336px minmax(360px,1fr) 256px;height:78vh;min-height:580px;margin-top:12px;
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+  .pane{min-width:0;overflow-y:auto}
+  .pane+.pane{border-left:1px solid var(--line)}
+
+  .rail{padding:12px 10px;background:#fbfbfd}
+  .compose-btn{width:100%;font:inherit;font-weight:700;font-size:13px;color:var(--brand);background:#fff;border:1.5px solid var(--brand);border-radius:999px;padding:9px;cursor:pointer;margin-bottom:14px}
+  .rail-h{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;color:var(--ink);padding:4px 8px 8px}
+  .rail-h .ic{width:22px;height:22px;border-radius:6px;background:var(--teal-soft);color:var(--teal-dark);display:grid;place-items:center;font-size:12px}
+  .rail-item{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13.5px;color:#3a3f52}
+  .rail-item:hover{background:#eef1f6}
+  .rail-item.active{background:var(--brand-soft);color:var(--brand-ink);font-weight:700}
+  .rail-item .gdot{width:9px;height:9px;border-radius:50%;flex:none}
+  .rail-item .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rail-item .cnt{flex:none;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--brand);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center}
+  .rail-item .own{font-size:10px;color:var(--muted);font-weight:600}
+
+  .list{display:flex;flex-direction:column}
+  .list-search{margin:12px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;color:var(--muted);font-size:13px;background:#fbfbfd}
+  .list-tabs{display:flex;gap:14px;padding:0 14px;border-bottom:1px solid var(--line)}
+  .list-tabs button{font:inherit;font-size:13px;font-weight:600;color:var(--muted);background:none;border:none;padding:8px 0 10px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;display:flex;align-items:center;gap:5px}
+  .list-tabs button.active{color:var(--ink);border-bottom-color:var(--teal)}
+  .list-tabs .dot{width:7px;height:7px;border-radius:50%}
+  .dot-amber{background:var(--amber)} .dot-green{background:var(--green)} .dot-gray{background:#9aa0b4}
+  .crow{padding:11px 14px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;gap:10px;align-items:center}
+  .crow:hover{background:#f7f9fc}
+  .crow.active{background:var(--brand-soft)}
+  .crow .cmain{flex:1;min-width:0}
+  .crow .cname{font-weight:700;font-size:13.5px}
+  .crow .cprev{color:#5a5f72;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+  .crow .cright{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}
+  .crow .ctime{font-size:11px;color:var(--muted)}
+  .resolve{font:inherit;font-size:11.5px;font-weight:600;color:var(--brand);background:#fff;border:1px solid var(--brand);border-radius:7px;padding:4px 10px;cursor:pointer}
+  .resolved-tag{font-size:11px;color:var(--green);font-weight:700}
+  .list-empty{padding:30px;text-align:center;color:var(--muted);font-size:13px}
+
+  .thread-col{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+  .th-head{padding:11px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;flex:none}
+  .th-head .ic{width:26px;height:26px;border-radius:7px;background:var(--teal-soft);color:var(--teal-dark);display:grid;place-items:center;font-size:13px;flex:none}
+  .th-head .ttl{flex:1;min-width:0}
+  .th-head .cid{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .th-head .cnm{font-weight:700;font-size:14px}
+  .th-actions{display:flex;align-items:center;gap:4px;flex:none;position:relative}
+  .icbtn{width:28px;height:28px;border-radius:7px;border:none;background:none;color:var(--muted);cursor:pointer;font-size:14px;display:grid;place-items:center}
+  .icbtn:hover{background:#eef1f6;color:var(--ink)}
+  .icbtn.deco{cursor:default;opacity:.55}
+  .icbtn.deco:hover{background:none}
+  .thread{flex:1;overflow-y:auto;padding:16px 16px 6px;display:flex;flex-direction:column;gap:13px;background:#fcfcfe}
+  .divider{align-self:center;background:#eceef4;color:var(--muted);font-size:11px;font-weight:700;padding:3px 12px;border-radius:999px}
+  .msg{display:flex;gap:8px;align-items:flex-end;max-width:80%}
+  .msg.in{align-self:flex-start}
+  .msg.out{align-self:flex-end;flex-direction:row}
+  .bub-av{width:30px;height:30px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-weight:700;font-size:11px}
+  .bub{border-radius:12px;padding:9px 12px}
+  .msg.in .bub{background:var(--bub-in);border-top-left-radius:4px}
+  .msg.out .bub{background:var(--bub-out);border-top-right-radius:4px}
+  .bub-text{font-size:13.5px;color:#262a38}
+  .bub-meta{font-size:10.5px;color:var(--muted);margin-top:6px;display:flex;align-items:center;gap:5px}
+  .bub-meta .ci{color:var(--teal-dark)}
+
+  .compose{flex:none;border-top:1px solid var(--line)}
+  .compose-head{background:var(--teal);color:#fff;font-size:12px;font-weight:600;padding:7px 14px;display:flex;justify-content:space-between;align-items:center}
+  .compose-body{padding:10px 14px}
+  .compose-body textarea{width:100%;border:none;resize:none;font:inherit;font-size:13.5px;height:56px;outline:none;color:var(--ink)}
+  .compose-foot{display:flex;align-items:center;justify-content:space-between;padding:6px 14px 12px}
+  .compose-foot .count{font-size:11.5px;color:var(--muted)}
+  .compose-foot .cicons{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:14px}
+  .send{width:30px;height:30px;border-radius:8px;border:none;background:#e23b3b;color:#fff;cursor:pointer;font-size:13px;display:grid;place-items:center}
+  .th-empty{flex:1;display:grid;place-items:center;color:var(--muted);font-size:13px;text-align:center;padding:30px}
+
+  .ctx{padding:14px}
+  .ctx .card-h{font-weight:700;font-size:13px;margin-bottom:10px}
+  .ctx .rec-name{color:var(--brand);font-weight:700;font-size:14px}
+  .ctx .roles{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 12px}
+  .ctx dl{margin:0;font-size:12px}
+  .ctx .frow{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed #edeff4}
+  .ctx .frow:last-of-type{border-bottom:none}
+  .ctx .k{color:var(--muted)}
+  .ctx .v{color:var(--ink);font-weight:600;text-align:right}
+  .ctx-empty{padding:24px;color:var(--muted);font-size:12.5px;text-align:center}
+
+  /* Spec views */
+  .narrow{max-width:1000px}
+  h2.sec{font-size:18px;margin:24px 0 4px}
+  p.lead{color:var(--muted);margin:0 0 14px;max-width:70ch}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 18px;margin-bottom:14px}
+  .card h3{margin:0 0 4px;font-size:15px}
+  .card .sub{color:var(--muted);font-size:13px;margin:0 0 12px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:700}
+  tr:last-child td{border-bottom:none}
+  ul.rules{margin:6px 0 0;padding-left:20px}
+  ul.rules li{margin:0 0 9px}
+  ul.rules li b{color:var(--ink)}
+  .num-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px;margin-bottom:8px}
+  .num-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 15px;cursor:pointer;transition:.12s;border-left:4px solid var(--line)}
+  .num-card:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(20,24,40,.09)}
+  .num-card.active{border-color:var(--teal);border-left-color:var(--teal);background:#fafdfe}
+  .num-card .kind{font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+  .num-card .lbl{font-weight:700;margin:5px 0 2px}
+  .num-card .ph{font-variant-numeric:tabular-nums;color:var(--brand-ink);font-weight:600;font-size:13.5px}
+  .num-card .d{color:var(--muted);font-size:12.5px;margin-top:6px}
+  .tree{margin-top:6px}
+  .branch{border-left:2px solid var(--line);padding:4px 0 4px 16px;margin-left:6px;position:relative}
+  .branch::before{content:"";position:absolute;left:-2px;top:16px;width:12px;height:2px;background:var(--line)}
+  .cond{font-weight:600}
+  .leads{display:inline-flex;align-items:center;gap:6px;margin-top:3px}
+  .leads .to{color:var(--muted)}
+  .sim{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+  .sim .col{flex:1;min-width:230px}
+  .sim .out{flex:1;min-width:240px;background:var(--teal-soft);border:1px solid #bfe9ef;border-radius:10px;padding:16px}
+  .sim .out .k{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--teal-dark)}
+  .sim .out .v{font-size:22px;font-weight:800;color:var(--teal-dark);margin:4px 0 8px}
+  .sim .out .x{font-size:13px;color:#2c5a62}
+  .sim .lblrow{font-size:12px;font-weight:600;color:var(--muted);margin:0 0 5px}
+  .seg2{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-bottom:12px}
+  .seg2 button{font:inherit;font-size:13px;font-weight:600;border:none;background:#fff;color:var(--muted);padding:7px 14px;cursor:pointer}
+  .seg2 button.active{background:var(--teal);color:#fff}
+  .sim select{width:100%}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="inner">
+    <div class="brand"><span class="dot">💬</span> Texting Inbox <span class="spec-tag">Interactive Spec</span></div>
+    <div class="controls">
+      <div class="field"><label for="persona">Viewing as</label><select id="persona"></select></div>
+      <button class="toggle on" id="specToggle"><span class="sw"></span> Spec notes</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="tabs" id="tabs">
+    <button data-view="inbox" class="active">Inbox</button>
+    <button data-view="subs">Subscriptions &amp; Roles</button>
+    <button data-view="routing">Number Routing</button>
+  </nav>
+  <main id="app"></main>
+  <div class="footer">Illustrative spec for Accelerated Academy · names are sample placeholders · inbound contacts &amp; messages are fictional · interactions demonstrate intended behavior, not a live system.</div>
+</div>
+
+<script>
+/* ---------------------------------------------------------------------------
+   DATA  — groups & people are the real AA roster; inbound contacts are fictional
+--------------------------------------------------------------------------- */
+const GROUPS = {
+  'Setter Group':'#6b4eff','Sales Manager':'#7c3aed',
+  'Student Support Group':'#0f7a4d','Student Support Manager':'#0b6b43','Career Services Group':'#c2410c',
+  'Collections Group':'#7c2d12','Finance Group':'#047857','Compliance Group':'#4338ca',
+  'B2B Group':'#0369a1','Program Management Group':'#b91c1c','Recruiting + Hiring Group':'#be123c',
+  'CPR Group':'#db2777','Supplies Group':'#a16207','Marketing Group':'#0891b2',
+  'Logan Sutton (User Inbox)':'#475569','Owen S (User Inbox)':'#475569',
+};
+const groupColor = g => GROUPS[g] || '#475569';
+
+// Authoritative role → group → people roster (from AA's list)
+const SERVICING = [
+  {role:'Potential Students',          group:'Setter Group',            people:['Riley D','Nova A','Sloane H','Greer L']},
+  {role:'Potential Students',          group:'Sales Manager',           people:['Harper B','Blair F']},
+  {role:'Potential Students',          group:'User Inbox',              people:['Logan Sutton','Emerson Hale','Finley Park','Hayden Cole']},
+  {role:'Students or Alumni',          group:'Student Support Group',   people:['Devon P','Tatum C','Peyton R']},
+  {role:'Students or Alumni',          group:'Student Support Manager', people:['Marlowe M']},
+  {role:'Students or Alumni',          group:'Career Services Group',   people:['Sydney Wells']},
+  {role:'Students or Alumni',          group:'Finance Group',           people:['Sage B','Oakley B','Parker J']},
+  {role:'Students or Alumni',          group:'Collections Group',       people:['Parker J']},
+  {role:'Instructors or Support Staff',group:'Program Management Group',people:['Rowan V','Ellis I','Frankie L']},
+  {role:'Potential Instructors',       group:'Recruiting + Hiring Group',people:['Gray B']},
+  {role:'CPR Instructors',             group:'CPR Group',               people:['Dakota Lane']},
+  {role:'Supply POC',                  group:'Supplies Group',          people:['Quincy H']},
+  {role:'Marketing POC',               group:'Marketing Group',         people:['Wren G']},
+  {role:'Potential Partners',          group:'B2B Group',               people:['Skyler K','Reese R']},
+  {role:'Partners',                    group:'User Inbox',              people:['Owen S']},
+  {role:'Governing Agency Reps',       group:'Compliance Group',        people:['Cameron T','Lennox T','Marin D']},
+];
+
+const PERSONAS = [
+  {id:'p1',   name:'Riley D',         role:'Setter',                  av:'#6b4eff', groups:['Setter Group']},
+  {id:'p2',  name:'Harper B',        role:'Sales Manager',           av:'#7c3aed', groups:['Sales Manager']},
+  {id:'p3', name:'Logan Sutton',  role:'Setter · personal inbox', av:'#475569', groups:['Logan Sutton (User Inbox)']},
+  {id:'p4', name:'Devon P',       role:'Student Support',         av:'#0f7a4d', groups:['Student Support Group']},
+  {id:'p5',  name:'Sydney Wells',  role:'Career Services',         av:'#c2410c', groups:['Career Services Group']},
+  {id:'p6',  name:'Parker J',        role:'Collections + Finance (2 groups)', av:'#7c2d12', groups:['Collections Group','Finance Group']},
+  {id:'p7',  name:'Rowan V',         role:'Program Management',      av:'#b91c1c', groups:['Program Management Group']},
+  {id:'p8',  name:'Skyler K',         role:'B2B',                     av:'#0369a1', groups:['B2B Group']},
+  {id:'p9',  name:'Cameron T',         role:'Compliance',              av:'#4338ca', groups:['Compliance Group']},
+];
+const persona = id => PERSONAS.find(p => p.id === id);
+const initialsOf = id => { const p = persona(id); return p ? p.name.split(' ').map(w=>w[0]).join('') : 'AA'; };
+
+// dir 'in' = inbound (contact)  ·  dir 'out' = outbound (by a team-member id)
+const CONVERSATIONS = [
+  {id:1, who:'Taylor Reed', init:'TR', roles:['Potential Student'], number:'main', subscribed:['Setter Group','Sales Manager'], owner:null, resolved:false,
+   record:{phone:'(225) 555-2231', pursuit:'Active', status:'New Lead', location:'Baton Rouge, LA'},
+   thread:[{dir:'in', text:'Saw your bootcamp ad — how much is tuition?', time:'2:14 PM', status:'received'}]},
+  {id:2, who:'Jordan Blake', init:'JB', roles:['Potential Student'], number:'main', subscribed:['Logan Sutton (User Inbox)'], owner:'Logan Sutton', resolved:false,
+   record:{phone:'(225) 555-8890', pursuit:'Active', status:'Working', location:'Gonzales, LA'},
+   thread:[{dir:'in', text:'Logan — following up on the info you sent over.', time:'1:50 PM', status:'received'}]},
+  {id:3, who:'Sara Kim', init:'SK', roles:['Student'], number:'main', subscribed:['Student Support Group','Student Support Manager'], owner:null, resolved:false,
+   record:{phone:'(225) 555-7741', pursuit:'Active', status:'In Program', location:'Baton Rouge, LA'},
+   thread:[{dir:'in', text:"I can't log into the LMS this morning — it keeps erroring.", time:'12:58 PM', status:'received'}]},
+  {id:4, who:'Marcus Bell', init:'MB', roles:['Alumni'], number:'main', subscribed:['Career Services Group'], owner:'Sydney Wells', resolved:false,
+   record:{phone:'(225) 555-1120', pursuit:'Active', status:'Graduate', location:'New Orleans, LA'},
+   thread:[
+     {dir:'in', text:'Any update on the resume review?', time:'11:10 AM', status:'received'},
+     {dir:'out', by:'p5', text:"Here's the template we discussed — take a look and tell me what you think.", time:'11:30 AM', status:'delivered'}]},
+  {id:5, who:'Robin Doss', init:'RD', roles:['Student'], number:'finance', subscribed:['Finance Group'], owner:null, resolved:false,
+   record:{phone:'(225) 555-3318', pursuit:'Active', status:'In Program', location:'Baton Rouge, LA'},
+   thread:[
+     {dir:'in', text:'Can I split my tuition into two payments?', time:'10:25 AM', status:'received'},
+     {dir:'out', by:'p6', text:"Yes — I'll set that up and text you the payment schedule.", time:'10:40 AM', status:'delivered'}]},
+  {id:6, who:'Drew Page', init:'DP', roles:['Alumni'], number:'collections', subscribed:['Collections Group'], owner:null, resolved:false,
+   record:{phone:'(225) 555-6624', pursuit:'Inactive', status:'Past Due', location:'Slidell, LA'},
+   thread:[{dir:'in', text:'Got the past-due notice — I will call in today.', time:'9:50 AM', status:'received'}]},
+  {id:7, who:'LA State Board', init:'SB', roles:['Governing Agency Rep'], number:'compliance', subscribed:['Compliance Group'], owner:null, resolved:false,
+   record:{phone:'(225) 555-0000', pursuit:'—', status:'Regulator', location:'Baton Rouge, LA'},
+   thread:[{dir:'in', text:'Requesting your latest instructor certification roster.', time:'9:20 AM', status:'received'}]},
+  {id:8, who:'BrightCo HR', init:'BC', roles:['Potential Partner'], number:'b2b', subscribed:['B2B Group'], owner:null, resolved:false,
+   record:{phone:'(337) 555-2048', pursuit:'Active', status:'Prospect', location:'Lafayette, LA'},
+   thread:[{dir:'in', text:'Interested in a hiring partnership — who do I talk to?', time:'9:05 AM', status:'received'}]},
+  {id:9, who:'Vertex Labs', init:'VL', roles:['Partner'], number:'b2b', subscribed:['Owen S (User Inbox)'], owner:'Owen S', resolved:false,
+   record:{phone:'(504) 555-7700', pursuit:'Active', status:'Active Partner', location:'New Orleans, LA'},
+   thread:[{dir:'in', text:'When do the renewal docs go out?', time:'8:50 AM', status:'received'}]},
+  {id:10, who:'Alex Stone', init:'AS', roles:['Instructor'], number:'instructors', subscribed:['Program Management Group'], owner:'Rowan V', resolved:false,
+   record:{phone:'(225) 555-4456', pursuit:'Active', status:'Active Instructor', location:'Baton Rouge, LA'},
+   thread:[
+     {dir:'in', text:'My Thursday section room got double-booked again.', time:'8:30 AM', status:'received'},
+     {dir:'out', by:'p7', text:"Moving you to Room B — I'll confirm with facilities now.", time:'8:42 AM', status:'delivered'}]},
+  {id:11, who:'Dana Brooks', init:'DB', roles:['Potential Instructor'], number:'instructors', subscribed:['Recruiting + Hiring Group'], owner:'Gray B', resolved:false,
+   record:{phone:'(225) 555-9982', pursuit:'Active', status:'Applicant', location:'Prairieville, LA'},
+   thread:[{dir:'in', text:'Following up on my instructor application.', time:'8:10 AM', status:'received'}]},
+  {id:12, who:'Pat Nguyen', init:'PN', roles:['CPR Instructor'], number:'instructors', subscribed:['CPR Group'], owner:null, resolved:false,
+   record:{phone:'(225) 555-5512', pursuit:'Active', status:'Active CPR Instructor', location:'Baton Rouge, LA'},
+   thread:[{dir:'in', text:'Need to reschedule the CPR cert session this week.', time:'7:55 AM', status:'received'}]},
+  {id:13, who:'Quinn Avery', init:'QA', roles:['Potential Student'], number:'main', subscribed:['Setter Group','Sales Manager'], owner:'Riley D', resolved:true,
+   record:{phone:'(225) 555-1015', pursuit:'Active', status:'Enrolled', location:'Baton Rouge, LA'},
+   thread:[
+     {dir:'in', text:'Thanks — I enrolled!', time:'Yesterday', status:'received'},
+     {dir:'out', by:'p1', text:'So excited for you — see you in week one!', time:'Yesterday', status:'delivered'}]},
+];
+const conv = id => CONVERSATIONS.find(c => c.id === id);
+
+const NUMBERS = [
+  {id:'main', label:'Customer / Student', number:'225-347-4752', kind:'Entity line', desc:'Potential students, students, alumni & customers. Routes by role.',
+   tree:{type:'entity', noRecord:'Setter Group', byRole:[
+     {role:'Potential Student', route:'Setter Group'},
+     {role:'Student',           route:'Student Support Group'},
+     {role:'Alumni',            route:'Career Services Group'},
+     {role:'Customer', byOwner:[
+        {cond:'Owner is Setters or Orphan', route:'Setter Group'},
+        {cond:'Owner is someone else',      route:"Record Owner's User Inbox"}]}]}},
+  {id:'instructors', label:'Instructor / Support Staff', number:'225-238-1068', kind:'Entity line', desc:'Instructors, staff, CPR, supplies & marketing POCs.',
+   tree:{type:'entity', noRecord:'Program Management Group', byRole:[
+     {role:'Potential Instructor',       route:'Recruiting + Hiring Group'},
+     {role:'Instructor / Support Staff', route:'Program Management Group'},
+     {role:'CPR Instructor',             route:'CPR Group'},
+     {role:'Supply POC',                 route:'Supplies Group'},
+     {role:'Marketing POC',              route:'Marketing Group'}]}},
+  {id:'b2b', label:'B2B / Partners', number:'225-825-8941', kind:'Entity line', desc:'Hiring partners & employer contacts.',
+   tree:{type:'entity', noRecord:'B2B Group', byRole:[
+     {role:'Potential Partner', route:'B2B Group'},
+     {role:'Partner', byOwner:[ {cond:'Look up account owner', route:"Owner's User Inbox"} ]},
+     {role:'Hiring Contact', route:'Career Services Group'}]}},
+  {id:'finance',     label:'Finance',     number:'225-397-7126', kind:'Dedicated', desc:'All billing & payment questions.',    tree:{type:'dedicated', route:'Finance Group'}},
+  {id:'collections', label:'Collections', number:'225-238-1943', kind:'Dedicated', desc:'Past-due & collections outreach.',     tree:{type:'dedicated', route:'Collections Group'}},
+  {id:'compliance',  label:'Compliance',  number:'TBD',          kind:'Dedicated', desc:'Governing-agency & accreditation reps. (Inferred 6th line — confirm number & flow.)', tree:{type:'dedicated', route:'Compliance Group'}},
+];
+const numberById = id => NUMBERS.find(n => n.id === id);
+
+/* ---------------------------------------------------------------------------
+   STATE + HELPERS
+--------------------------------------------------------------------------- */
+const state = {view:'inbox', personaId:'p1', specNotes:true,
+  inbox:'Setter Group', listTab:'priority', openConv:null,
+  routingOpen:'main', sim:{numberId:'main', recordFound:'yes', role:null, ownerIdx:0}, flash:null};
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const chip = g => `<span class="chip" style="background:${groupColor(g)}1a;color:${groupColor(g)}">${esc(g)}</span>`;
+const note = (html, sm) => state.specNotes ? `<div class="note${sm?' sm':''}"><span class="tag">SPEC</span><div>${html}</div></div>` : '';
+
+const lastMsg = c => c.thread[c.thread.length-1];
+const attended = c => c.thread.some(m => m.dir==='out');
+const lastSenderId = c => { const m = lastMsg(c); return m.dir==='in' ? 'them' : m.by; };
+const visibleFor = p => CONVERSATIONS.filter(c => c.subscribed.some(g => p.groups.includes(g)));
+// priority = you sent last · unattended (no outbound yet) · unowned
+const isPriority = (c, pid) => lastSenderId(c)===pid || !attended(c) || !c.owner;
+
+/* ---------------------------------------------------------------------------
+   RENDER
+--------------------------------------------------------------------------- */
+function render(){
+  const app = document.getElementById('app');
+  app.innerHTML = state.view==='inbox' ? renderInbox() : state.view==='subs' ? renderSubs() : renderRouting();
+  document.querySelectorAll('#tabs>button').forEach(b => b.classList.toggle('active', b.dataset.view===state.view));
+  if(state.view==='inbox'){ const t = app.querySelector('[data-thread]'); if(t) t.scrollTop = t.scrollHeight; }
+}
+
+function renderInbox(){
+  const p = persona(state.personaId);
+  if(!p.groups.includes(state.inbox)) state.inbox = p.groups[0];
+
+  const visAll  = visibleFor(p);
+  const inInbox = visAll.filter(c => c.subscribed.includes(state.inbox));
+  const byTab = {
+    priority:   c => !c.resolved && isPriority(c, p.id),
+    unresolved: c => !c.resolved,
+    resolved:   c => c.resolved,
+    all:        () => true,
+  };
+  const counts = {
+    priority:   inInbox.filter(byTab.priority).length,
+    unresolved: inInbox.filter(byTab.unresolved).length,
+    resolved:   inInbox.filter(byTab.resolved).length,
+    all:        inInbox.length,
+  };
+  const list = inInbox.filter(byTab[state.listTab]);
+  if(!list.find(c => c.id===state.openConv)) state.openConv = list.length ? list[0].id : null;
+
+  const meta = `<div class="ws-meta">
+    <span class="avatar" style="background:${p.av}">${initialsOf(p.id)}</span>
+    <span>Viewing as <b>${esc(p.name)}</b> · ${esc(p.role)} · member of ${p.groups.map(chip).join(' ')}</span>
+  </div>`;
+  const specNote = note(`Visibility is driven entirely by <b>group subscription</b>. The rail on the left is exactly the set of inboxes ${esc(p.name)} belongs to — switch <b>Viewing as</b> and the rail, the counts, and every conversation change. The <b>Priority</b> tab reuses the existing priority inbox: messages you sent last, plus unattended and unowned ones. Nobody sees a message their groups aren't subscribed to.`);
+  const flash = state.flash ? `<div class="flash">✓ ${esc(state.flash)}</div>` : '';
+
+  return meta + specNote + flash + `<div class="shell">
+    ${renderRail(p, visAll)}
+    ${renderList(list, counts)}
+    ${renderThread(state.openConv ? conv(state.openConv) : null, p)}
+    ${renderContext(state.openConv ? conv(state.openConv) : null)}
+  </div>`;
+}
+
+function renderRail(p, visAll){
+  const items = p.groups.map(g => {
+    const n = visAll.filter(c => c.subscribed.includes(g) && !c.resolved).length;
+    const owner = g.includes('(User Inbox)');
+    const nm = owner ? g.replace(' (User Inbox)','') : g;
+    return `<div class="rail-item ${state.inbox===g?'active':''}" data-inbox="${esc(g)}">
+      <span class="gdot" style="background:${groupColor(g)}"></span>
+      <span class="nm">${esc(nm)} ${owner?'<span class="own">· my inbox</span>':''}</span>
+      ${n?`<span class="cnt">${n}</span>`:''}
+    </div>`;
+  }).join('');
+  return `<div class="pane rail">
+    <button class="compose-btn">＋ Compose Text</button>
+    <div class="rail-h"><span class="ic">💬</span> SMS Inboxes</div>
+    ${items}
+  </div>`;
+}
+
+function renderList(list, counts){
+  const tab = (key,label,dot)=>`<button data-tab="${key}" class="${state.listTab===key?'active':''}">${label} ${dot?`<span class="dot ${dot}"></span>`:''}<span style="color:var(--muted);font-weight:600">${counts[key]}</span></button>`;
+  const rows = list.length ? list.map(convRow).join('') : `<div class="list-empty">No conversations in this view.</div>`;
+  return `<div class="pane list">
+    <div class="list-search">🔍 Search conversations…</div>
+    <div class="list-tabs">
+      ${tab('priority','Priority')}
+      ${tab('unresolved','Unresolved','dot-amber')}
+      ${tab('resolved','Resolved','dot-green')}
+      ${tab('all','All','dot-gray')}
+    </div>
+    <div>${rows}</div>
+  </div>`;
+}
+
+function convRow(c){
+  const m = lastMsg(c);
+  const prev = (m.dir==='out'?'You: ':'') + m.text;
+  return `<div class="crow ${state.openConv===c.id?'active':''}" data-open="${c.id}">
+    <div class="cmain">
+      <div class="cname">${esc(c.who)}</div>
+      <div class="cprev">${esc(prev)}</div>
+    </div>
+    <div class="cright">
+      <span class="ctime">${esc(m.time)}</span>
+      ${c.resolved ? `<span class="resolved-tag">✓ Resolved</span>` : `<button class="resolve" data-resolve="${c.id}">Resolve</button>`}
+    </div>
+  </div>`;
+}
+
+function renderThread(c, p){
+  if(!c) return `<div class="pane thread-col"><div class="th-empty">Select a conversation to open the thread.</div></div>`;
+  const num = numberById(c.number);
+  const bubbles = c.thread.map(m => {
+    const inbound = m.dir==='in';
+    const av = inbound
+      ? `<span class="bub-av" style="background:${c.init==='?'?'#9aa0b4':groupColor(c.subscribed[0])}">${esc(c.init)}</span>`
+      : `<span class="bub-av" style="background:var(--brand)">${esc(initialsOf(m.by))}</span>`;
+    const bub = `<div class="bub"><div class="bub-text">${esc(m.text)}</div>
+      <div class="bub-meta"><span class="ci">💬</span> SMS · ${esc(m.status)} · ${esc(m.time)} ⓘ</div></div>`;
+    return `<div class="msg ${inbound?'in':'out'}">${inbound?av+bub:bub+av}</div>`;
+  }).join('');
+
+  return `<div class="pane thread-col">
+    <div class="th-head">
+      <span class="ic">💬</span>
+      <div class="ttl"><div class="cnm">${esc(c.who)}</div><div class="cid">Conversation · ${esc(num?num.number:'')} ↔ ${esc(c.record.phone)}</div></div>
+      <div class="th-actions">
+        <button class="icbtn deco" title="Download">⤓</button>
+        <button class="icbtn deco" title="More">⋯</button>
+        <button class="icbtn" title="Reassign" data-reassign="${c.id}">⇄</button>
+        ${c.resolved?'<span class="resolved-tag" style="padding:0 6px">✓ Resolved</span>':`<button class="icbtn" title="Resolve" data-resolve="${c.id}">✓</button>`}
+        <button class="icbtn" title="Close" data-close="1">✕</button>
+      </div>
+    </div>
+    <div class="thread" data-thread>
+      <div class="divider">Today</div>
+      ${bubbles}
+    </div>
+    <div class="compose">
+      <div class="compose-head"><span>💬 ${esc(c.record.phone)}</span><span>From: ${esc(num?num.number:'')}</span></div>
+      <div class="compose-body"><textarea data-compose placeholder="Compose your message"></textarea></div>
+      <div class="compose-foot">
+        <span class="count" data-count>0 / 1600</span>
+        <span class="cicons">🔗 🙂 { } ⏰ <button class="send" data-send title="Send">➤</button></span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderContext(c){
+  if(!c) return `<div class="pane ctx"><div class="ctx-empty">Open a conversation to see the matched Associate record.</div></div>`;
+  const roles = c.roles.length ? c.roles.map(r=>`<span class="badge">${esc(r)}</span>`).join('') : `<span class="badge">No record</span>`;
+  const frow = (k,v)=>`<div class="frow"><span class="k">${k}</span><span class="v">${esc(v)}</span></div>`;
+  return `<div class="pane ctx">
+    <div class="card-h">Associate Record</div>
+    <div class="rec-name">${esc(c.who)}</div>
+    <div class="roles">${roles}</div>
+    ${frow('Phone', c.record.phone)}
+    ${frow('Status', c.record.status)}
+    ${frow('Pursuit', c.record.pursuit)}
+    ${frow('Location', c.record.location)}
+    ${frow('Owner', c.owner || '—')}
+    ${frow('Inbound line', numberById(c.number).label)}
+    <div class="frow"><span class="k">Subscribed inbox</span><span class="v">${c.subscribed.map(chip).join('')}</span></div>
+    ${note(`Roles are <b>auto-assigned from child records</b>. Those roles + the inbound line drove the auto-subscription above — change the role and this conversation would re-route to a different inbox.`, true)}
+  </div>`;
+}
+
+function openReassign(convId, anchor){
+  const c = conv(convId);
+  const sel = document.createElement('select');
+  sel.innerHTML = `<option value="">Reassign to…</option>` +
+    Object.keys(GROUPS).map(g=>`<option value="${g}" ${c.subscribed.includes(g)?'disabled':''}>${g}</option>`).join('');
+  anchor.replaceWith(sel); sel.focus();
+  sel.onchange = () => {
+    if(!sel.value) return;
+    const old = c.subscribed.join(', ');
+    c.subscribed = [sel.value];
+    state.flash = `Reassigned ${c.who} → ${sel.value}. Previous subscription (${old}) auto-removed.`;
+    render();
+  };
+  sel.onblur = () => render(); // dismissing without a choice restores the button
+}
+function resolveConv(id){ const c = conv(id); c.resolved = true; state.flash = `Marked “${c.who}” resolved.`; render(); }
+function sendMessage(){
+  const ta = document.querySelector('[data-compose]'); if(!ta) return;
+  const val = ta.value.trim(); if(!val) return;
+  conv(state.openConv).thread.push({dir:'out', by:state.personaId, text:val, time:'Just now', status:'delivered'});
+  state.flash = null; render();
+}
+
+/* ---- SUBSCRIPTIONS & ROLES ---- */
+function renderSubs(){
+  const servRows = SERVICING.map(s=>`<tr><td>${chip(s.group)}</td><td>${esc(s.role)}</td><td>${s.people.map(p=>`<span class="badge">${esc(p)}</span>`).join(' ')}</td></tr>`).join('');
+  const table = `<table><thead><tr><th>Group / inbox</th><th>Services role</th><th>Subscribed people</th></tr></thead><tbody>${servRows}</tbody></table>`;
+
+  return `<div class="narrow">
+  <h2 class="sec">How subscriptions work</h2>
+  <p class="lead">An Associate record's <b>roles</b> are auto-assigned from its child records. When a text arrives, the platform reads the inbound line + the record's role(s) + owner, then <b>auto-subscribes</b> the right group. Anyone in that group sees the conversation; everyone else does not.</p>
+  ${note(`Roles are <b>derived, not hand-set</b> — they recompute when child records change, so subscriptions must recompute too. A role change can move a live conversation from one group's inbox to another's.`)}
+  <div class="card"><h3>① Group roster — who services which role</h3>
+    <p class="sub">AA's real groups and members. A "User Inbox" is one person's personal inbox (a group of one).</p>${table}
+    ${note(`Some roles map to <b>several</b> groups (e.g., <i>Students or Alumni</i> → Student Support, Career Services, Finance, Collections). When that happens, the <b>inbound line</b> decides which group is subscribed — see Number Routing. Manager inboxes (Sales Manager, Student Support Manager) are co-subscribed alongside their team's group.`, true)}</div>
+  <div class="card"><h3>② Auto-unsubscribe</h3>
+    <p class="sub">When a subscription should drop without anyone doing it manually.</p>
+    <ul class="rules">
+      <li><b>On reassignment</b> — subscribing a new group/person removes the previous one (try the <b>⇄ Reassign</b> icon in a thread header).</li>
+      <li><b>On role change</b> — if derived roles change, the conversation re-routes; the no-longer-matching group is dropped.</li>
+      <li><b>On owner change</b> — owner-routed conversations follow the owner; the prior owner's personal inbox unsubscribes.</li>
+      <li><b>On resolve</b> — resolving clears active subscriptions (history stays on the record).</li>
+    </ul></div>
+  <div class="card"><h3>③ Reassignment</h3>
+    <p class="sub">Manual override of the automatic routing.</p>
+    <ul class="rules">
+      <li>Any team member can reassign a conversation to a different <b>group</b> or <b>person</b>.</li>
+      <li>One step: subscribe the new target, auto-unsubscribe the old one (rule ② above).</li>
+      <li>Reassigning to a <b>person</b> uses that person's User Inbox — a "group of one."</li>
+    </ul>
+    ${note(`Reassignment is a subscription change, never a copy — there's always exactly one set of subscribers responsible, so messages don't get worked twice or dropped between teams.`)}</div>
+  </div>`;
+}
+
+/* ---- NUMBER ROUTING ---- */
+function renderRouting(){
+  const cards = NUMBERS.map(n => `<div class="num-card ${state.routingOpen===n.id?'active':''}" data-num="${n.id}" style="border-left-color:${n.tree.type==='dedicated'?'var(--teal)':'var(--brand)'}">
+    <div class="kind">${esc(n.kind)}</div><div class="lbl">${esc(n.label)}</div><div class="ph">${esc(n.number)}</div><div class="d">${esc(n.desc)}</div></div>`).join('');
+  const open = numberById(state.routingOpen);
+  return `<div class="narrow">
+  <h2 class="sec">6 textable numbers <span style="color:var(--muted);font-weight:400;font-size:14px">(down from 23)</span></h2>
+  <p class="lead">Three lines map to an <b>entity type</b> and route by role; three are <b>dedicated functions</b> (Finance, Collections, Compliance) with their own number. Select a card for its routing, or use the simulator.</p>
+  ${note(`Consolidating to 6 numbers means routing does the work the extra numbers used to — that's why role-based auto-subscription matters. <b>To confirm with the team:</b> Compliance's number &amp; flow; whether Supply POC and Marketing POC ride the Instructor line; and that manager inboxes co-subscribe alongside their team group.`)}
+  <div class="num-grid">${cards}</div>
+  <div class="card"><h3>${esc(open.label)} · ${esc(open.number)}</h3><p class="sub">Routing logic${open.tree.type==='entity'?' — evaluated top to bottom':''}.</p>${renderTree(open.tree)}</div>
+  <div class="card"><h3>Simulate an inbound text</h3><p class="sub">Walk a hypothetical text through routing to see which group gets auto-subscribed.</p>${renderSim()}</div>
+  </div>`;
+}
+function renderTree(tree){
+  if(tree.type==='dedicated') return `<div class="tree"><div class="branch"><span class="cond">Any inbound text</span><div class="leads"><span class="to">→ route &amp; subscribe</span> ${chip(tree.route)}</div></div></div>`;
+  let html = `<div class="tree"><div class="branch"><span class="cond">No Associate record found</span><div class="leads"><span class="to">→</span> ${chip(tree.noRecord)}</div></div>
+    <div class="branch"><span class="cond">Associate record found — by role:</span>`;
+  tree.byRole.forEach(b => {
+    if(b.byOwner) html += `<div class="branch"><span class="cond">${esc(b.role)}</span>` + b.byOwner.map(o=>`<div class="branch"><span class="cond">${esc(o.cond)}</span><div class="leads"><span class="to">→</span> ${chip(o.route)}</div></div>`).join('') + `</div>`;
+    else html += `<div class="branch"><span class="cond">${esc(b.role)}</span><div class="leads"><span class="to">→</span> ${chip(b.route)}</div></div>`;
+  });
+  return html + `</div></div>`;
+}
+function resolveRoute(){
+  const s = state.sim, n = numberById(s.numberId);
+  if(n.tree.type==='dedicated') return {route:n.tree.route, why:`${n.label} is a dedicated line — every text routes here.`};
+  if(s.recordFound==='no') return {route:n.tree.noRecord, why:'No Associate record matched the sender’s number.'};
+  const role = s.role || n.tree.byRole[0].role;
+  const b = n.tree.byRole.find(x=>x.role===role) || n.tree.byRole[0];
+  if(b.byOwner){ const o = b.byOwner[s.ownerIdx||0] || b.byOwner[0]; return {route:o.route, why:`Role ${b.role} · ${o.cond}.`}; }
+  return {route:b.route, why:`Role ${b.role} on the matched record.`};
+}
+function renderSim(){
+  const s = state.sim, n = numberById(s.numberId);
+  const numSel = `<div class="lblrow">Inbound number</div><select data-sim="number">${NUMBERS.map(x=>`<option value="${x.id}" ${x.id===s.numberId?'selected':''}>${x.label} · ${x.number}</option>`).join('')}</select>`;
+  let controls = '';
+  if(n.tree.type==='entity'){
+    controls += `<div class="lblrow" style="margin-top:12px">Associate record found?</div><div class="seg2">
+      <button data-sim="rf" data-v="yes" class="${s.recordFound==='yes'?'active':''}">Yes</button>
+      <button data-sim="rf" data-v="no" class="${s.recordFound==='no'?'active':''}">No</button></div>`;
+    if(s.recordFound==='yes'){
+      const role = s.role || n.tree.byRole[0].role;
+      controls += `<div class="lblrow">Role on record</div><select data-sim="role">${n.tree.byRole.map(b=>`<option value="${esc(b.role)}" ${b.role===role?'selected':''}>${esc(b.role)}</option>`).join('')}</select>`;
+      const b = n.tree.byRole.find(x=>x.role===role) || n.tree.byRole[0];
+      if(b.byOwner && b.byOwner.length>1) controls += `<div class="lblrow" style="margin-top:12px">Owner</div><select data-sim="owner">${b.byOwner.map((o,i)=>`<option value="${i}" ${i===(s.ownerIdx||0)?'selected':''}>${esc(o.cond)}</option>`).join('')}</select>`;
+    }
+  }
+  const r = resolveRoute();
+  return `<div class="sim"><div class="col">${numSel}${controls}</div>
+    <div class="out"><div class="k">Routes to · auto-subscribes</div><div class="v">${esc(r.route)}</div>
+    <div class="x">${esc(r.why)} Everyone in that group sees it in their inbox.</div></div></div>`;
+}
+
+/* ---------------------------------------------------------------------------
+   WIRING
+--------------------------------------------------------------------------- */
+const personaSel = document.getElementById('persona');
+personaSel.innerHTML = PERSONAS.map(p=>`<option value="${p.id}">${p.name} — ${p.role}</option>`).join('');
+personaSel.value = state.personaId;
+personaSel.onchange = e => { state.personaId = e.target.value; state.inbox = persona(e.target.value).groups[0]; state.openConv = null; state.flash = null; render(); };
+
+document.getElementById('specToggle').onclick = e => { state.specNotes = !state.specNotes; e.currentTarget.classList.toggle('on', state.specNotes); render(); };
+document.getElementById('tabs').onclick = e => { const b = e.target.closest('button[data-view]'); if(!b) return; state.view = b.dataset.view; state.flash = null; render(); };
+
+const app = document.getElementById('app');
+app.addEventListener('click', e => {
+  const inbox = e.target.closest('[data-inbox]'); if(inbox){ state.inbox = inbox.dataset.inbox; state.openConv = null; render(); return; }
+  const listTab = e.target.closest('.list-tabs [data-tab]'); if(listTab){ state.listTab = listTab.dataset.tab; render(); return; }
+  const res = e.target.closest('[data-resolve]'); if(res){ resolveConv(+res.dataset.resolve); return; }
+  const rea = e.target.closest('[data-reassign]'); if(rea){ openReassign(+rea.dataset.reassign, rea); return; }
+  if(e.target.closest('[data-close]')){ state.openConv = null; render(); return; }
+  if(e.target.closest('[data-send]')){ sendMessage(); return; }
+  const row = e.target.closest('[data-open]'); if(row){ state.openConv = +row.dataset.open; render(); return; }
+  const card = e.target.closest('[data-num]'); if(card){ state.routingOpen = card.dataset.num; state.sim.numberId = card.dataset.num; state.sim.role = null; state.sim.ownerIdx = 0; render(); return; }
+  const seg = e.target.closest('[data-sim="rf"]'); if(seg){ state.sim.recordFound = seg.dataset.v; render(); return; }
+});
+app.addEventListener('input', e => {
+  if(e.target.matches('[data-compose]')){ const cnt = app.querySelector('[data-count]'); if(cnt) cnt.textContent = `${e.target.value.length} / 1600`; }
+});
+app.addEventListener('change', e => {
+  const t = e.target;
+  if(t.dataset.sim==='number'){ state.sim.numberId = t.value; state.routingOpen = t.value; state.sim.role = null; state.sim.ownerIdx = 0; render(); }
+  else if(t.dataset.sim==='role'){ state.sim.role = t.value; state.sim.ownerIdx = 0; render(); }
+  else if(t.dataset.sim==='owner'){ state.sim.ownerIdx = +t.value; render(); }
+});
+
+render();
+</script>
+</body>
+</html>
