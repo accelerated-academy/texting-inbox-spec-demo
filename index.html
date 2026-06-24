@@ -115,6 +115,10 @@
   .bub-text{font-size:13.5px;color:#262a38}
   .bub-meta{font-size:10.5px;color:var(--muted);margin-top:6px;display:flex;align-items:center;gap:5px}
   .bub-meta .ci{color:var(--teal-dark)}
+  .reassign-alert{display:flex;align-items:center;gap:8px;background:var(--amber-soft);border:1px solid #f0d49a;color:var(--amber);font-size:12px;font-weight:600;padding:8px 12px;border-radius:9px;margin-bottom:4px}
+  .reassign-alert .ack{margin-left:auto;border:none;background:none;color:var(--amber);cursor:pointer;font-size:12px;padding:2px 5px;border-radius:5px}
+  .reassign-alert .ack:hover{background:#f3ddb0}
+  .reassigned-pill{font-size:10px;font-weight:700;color:var(--amber);background:var(--amber-soft);padding:1px 6px;border-radius:5px;white-space:nowrap}
 
   .compose{flex:none;border-top:1px solid var(--line)}
   .compose-head{background:var(--teal);color:#fff;font-size:12px;font-weight:600;padding:7px 14px;display:flex;justify-content:space-between;align-items:center}
@@ -249,7 +253,7 @@ const initialsOf = id => { const p = persona(id); return p ? p.name.split(' ').m
 
 // dir 'in' = inbound (contact)  ·  dir 'out' = outbound (by a team-member id)
 const CONVERSATIONS = [
-  {id:1, who:'Taylor Reed', init:'TR', roles:['Potential Student'], number:'main', subscribed:['Setter Group','Sales Manager'], owner:null, resolved:false,
+  {id:1, who:'Taylor Reed', init:'TR', roles:['Potential Student'], number:'main', subscribed:['Setter Group','Sales Manager'], owner:null, resolved:false, reassignedFrom:'Student Support Group', reassignedBy:'Devon P',
    record:{phone:'(225) 555-2231', pursuit:'Active', status:'New Lead', location:'Baton Rouge, LA'},
    thread:[{dir:'in', text:'Saw your bootcamp ad — how much is tuition?', time:'2:14 PM', status:'received'}]},
   {id:2, who:'Jordan Blake', init:'JB', roles:['Potential Student'], number:'main', subscribed:['Logan Sutton (User Inbox)'], owner:'Logan Sutton', resolved:false,
@@ -428,7 +432,7 @@ function convRow(c){
   const prev = (m.dir==='out'?'You: ':'') + m.text;
   return `<div class="crow ${state.openConv===c.id?'active':''}" data-open="${c.id}">
     <div class="cmain">
-      <div class="cname">${esc(c.who)}</div>
+      <div class="cname">${esc(c.who)}${c.reassignedFrom?` <span class="reassigned-pill">↪ reassigned</span>`:''}</div>
       <div class="cprev">${esc(prev)}</div>
     </div>
     <div class="cright">
@@ -464,6 +468,7 @@ function renderThread(c, p){
       </div>
     </div>
     <div class="thread" data-thread>
+      ${c.reassignedFrom ? `<div class="reassign-alert">↪ <b>Reassigned to this inbox</b> from <b>${esc(c.reassignedFrom)}</b>${c.reassignedBy?` · by ${esc(c.reassignedBy)}`:''}<button class="ack" data-ack="${c.id}" title="Dismiss">✕</button></div>` : ''}
       <div class="divider">Today</div>
       ${bubbles}
     </div>
@@ -506,6 +511,7 @@ function openReassign(convId, anchor){
   sel.onchange = () => {
     if(!sel.value) return;
     const old = c.subscribed.join(', ');
+    c.reassignedFrom = old; c.reassignedBy = persona(state.personaId).name;
     c.subscribed = [sel.value];
     state.flash = `Reassigned ${c.who} → ${sel.value}. Previous subscription (${old}) auto-removed.`;
     render();
@@ -620,6 +626,7 @@ const app = document.getElementById('app');
 app.addEventListener('click', e => {
   const inbox = e.target.closest('[data-inbox]'); if(inbox){ state.inbox = inbox.dataset.inbox; state.openConv = null; render(); return; }
   const listTab = e.target.closest('.list-tabs [data-tab]'); if(listTab){ state.listTab = listTab.dataset.tab; render(); return; }
+  const ack = e.target.closest('[data-ack]'); if(ack){ const c=conv(+ack.dataset.ack); c.reassignedFrom=null; c.reassignedBy=null; render(); return; }
   const res = e.target.closest('[data-resolve]'); if(res){ resolveConv(+res.dataset.resolve); return; }
   const rea = e.target.closest('[data-reassign]'); if(rea){ openReassign(+rea.dataset.reassign, rea); return; }
   if(e.target.closest('[data-close]')){ state.openConv = null; render(); return; }
