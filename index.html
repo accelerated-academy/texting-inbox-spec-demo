@@ -304,14 +304,13 @@ const CONVERSATIONS = [
 const conv = id => CONVERSATIONS.find(c => c.id === id);
 
 const NUMBERS = [
-  {id:'main', label:'Customer / Student', number:'225-347-4752', kind:'Entity line', desc:'Potential students, students, alumni & customers. Routes by role.',
+  {id:'main', label:'Customer / Student', number:'225-347-4752', kind:'Entity line', desc:'Potential students, students & alumni. Routes by role.',
    tree:{type:'entity', noRecord:'Setter Group', byRole:[
-     {role:'Potential Student', route:'Setter Group'},
-     {role:'Student',           route:'Student Support Group'},
-     {role:'Alumni',            route:'Career Services Group'},
-     {role:'Customer', byOwner:[
+     {role:'Potential Student', byOwner:[
         {cond:'Owner is Setters or Orphan', route:'Setter Group'},
-        {cond:'Owner is someone else',      route:"Record Owner's User Inbox"}]}]}},
+        {cond:'Owner is someone else',      route:"Record Owner's User Inbox"}]},
+     {role:'Student', route:'Student Support Group'},
+     {role:'Alumni',  route:'Career Services Group'}]}},
   {id:'instructors', label:'Instructor / Support Staff', number:'225-238-1068', kind:'Entity line', desc:'Instructors, staff, CPR, supplies & marketing POCs.',
    tree:{type:'entity', noRecord:'Program Management Group', byRole:[
      {role:'Potential Instructor',       route:'Recruiting + Hiring Group'},
@@ -366,6 +365,7 @@ const isPriority = (c, pid) => lastSenderId(c)===pid || !attended(c) || !c.owner
 function render(){
   const app = document.getElementById('app');
   app.innerHTML = state.view==='inbox' ? renderInbox() : state.view==='subs' ? renderSubs() : renderRouting();
+  const ps = document.getElementById('persona'); if(ps) ps.value = state.personaId;
   document.querySelectorAll('#tabs>button').forEach(b => b.classList.toggle('active', b.dataset.view===state.view));
   if(state.view==='inbox'){ const t = app.querySelector('[data-thread]'); if(t) t.scrollTop = t.scrollHeight; }
 }
@@ -444,7 +444,7 @@ function convRow(c){
   const prev = (m.dir==='out'?'You: ':'') + m.text;
   return `<div class="crow ${state.openConv===c.id?'active':''}" data-open="${c.id}">
     <div class="cmain">
-      <div class="cname">${esc(c.who)}${c.reassignedFrom?` <span class="reassigned-pill">↪ reassigned</span>`:''}</div>
+      <div class="cname">${esc(c.who)}${c.reassignedFrom?` <span class="reassigned-pill">↪ reassigned</span>`:c.referredFrom?` <span class="reassigned-pill" style="color:var(--teal-dark);background:var(--teal-soft)">↪ referred</span>`:''}</div>
       <div class="cprev">${esc(prev)}</div>
     </div>
     <div class="cright">
@@ -481,6 +481,7 @@ function renderThread(c, p){
     </div>
     <div class="thread" data-thread>
       ${c.reassignedFrom ? `<div class="reassign-alert">↪ <b>Reassigned to this inbox</b> from <b>${esc(c.reassignedFrom)}</b>${c.reassignedBy?` · by ${esc(c.reassignedBy)}`:''}<button class="ack" data-ack="${c.id}" title="Dismiss">✕</button></div>` : ''}
+      ${c.referredFrom ? `<div class="reassign-alert" style="background:var(--teal-soft);border-color:#bfe9ef;color:var(--teal-dark)">↪ <b>Referred to this inbox</b> from <b>${esc(c.referredFrom)}</b><button class="ack" data-ack="${c.id}" title="Dismiss" style="color:var(--teal-dark)">✕</button></div>` : ''}
       <div class="divider">Today</div>
       ${bubbles}
     </div>
@@ -533,14 +534,32 @@ function openReassign(convId, anchor){
       c.subscribed = [g];
       state.flash = `Reassigned ${c.who} → ${g}. Previous subscription (${old}) auto-removed.`;
     } else {
-      const ln = numberById(groupHomeLine[g]);
-      state.flash = `Referred ${c.who} to ${g} — a new conversation opens on ${ln?`${ln.label} (${ln.number})`:'their line'}; this thread stays in ${c.subscribed.join(', ')}.`;
+      referConv(c, g);
     }
     render();
   };
   sel.onblur = () => render(); // dismissing without a choice restores the button
 }
 function resolveConv(id){ const c = conv(id); c.resolved = true; state.flash = `Marked “${c.who}” resolved.`; render(); }
+function referConv(c, g){
+  const ln = numberById(groupHomeLine[g]), origLine = numberById(c.number);
+  const newId = Math.max(...CONVERSATIONS.map(x=>x.id)) + 1;
+  CONVERSATIONS.push({
+    id:newId, who:c.who, init:c.init, roles:c.roles.slice(),
+    number:groupHomeLine[g], subscribed:[g], owner:null, resolved:false,
+    record:Object.assign({}, c.record),
+    referredFrom:`${c.subscribed.join(', ')}${origLine?` · ${origLine.label} line`:''}`,
+    thread:c.thread.map(m=>Object.assign({}, m)),
+  });
+  const lbl = ln ? `${ln.label} (${ln.number})` : 'their';
+  const target = PERSONAS.find(p=>p.groups.includes(g));
+  if(target){
+    state.personaId = target.id; state.inbox = g; state.openConv = newId;
+    state.flash = `Referred ${c.who} to ${g} on the ${lbl} line — now viewing as ${target.name} (${g}), where the referral just landed.`;
+  } else {
+    state.flash = `Referred ${c.who} to ${g} — opened a conversation on the ${lbl} line. (No demo persona belongs to ${g} to preview it here.)`;
+  }
+}
 function sendMessage(){
   const ta = document.querySelector('[data-compose]'); if(!ta) return;
   const val = ta.value.trim(); if(!val) return;
@@ -587,7 +606,7 @@ function renderRouting(){
   return `<div class="narrow">
   <h2 class="sec">6 textable numbers <span style="color:var(--muted);font-weight:400;font-size:14px">(down from 23)</span></h2>
   <p class="lead">Three lines map to an <b>entity type</b> and route by role; three are <b>dedicated functions</b> (Finance, Collections, Compliance) with their own number. Select a card for its routing, or use the simulator.</p>
-  ${note(`Consolidating to 6 numbers means routing does the work the extra numbers used to — that's why role-based auto-subscription matters. <b>Confirmed:</b> Compliance line is 225-480-0033; managers (Sales Manager, Student Support Manager) co-subscribe alongside their team; and the inbound line is the disambiguator when a role maps to several groups. <b>Still open:</b> whether Supply POC &amp; Marketing POC ride this Instructor line.`)}
+  ${note(`Consolidating to 6 numbers means routing does the work the extra numbers used to — that's why role-based auto-subscription matters. <b>Confirmed:</b> Compliance line is 225-480-0033; Supply &amp; Marketing POCs ride this Instructor line; managers (Sales Manager, Student Support Manager) co-subscribe with their team; and the inbound line disambiguates when a role maps to several groups.`)}
   <div class="num-grid">${cards}</div>
   <div class="card"><h3>${esc(open.label)} · ${esc(open.number)}</h3><p class="sub">Routing logic${open.tree.type==='entity'?' — evaluated top to bottom':''}.</p>${renderTree(open.tree)}</div>
   <div class="card"><h3>Simulate an inbound text</h3><p class="sub">Walk a hypothetical text through routing to see which group gets auto-subscribed.</p>${renderSim()}</div>
@@ -648,7 +667,7 @@ const app = document.getElementById('app');
 app.addEventListener('click', e => {
   const inbox = e.target.closest('[data-inbox]'); if(inbox){ state.inbox = inbox.dataset.inbox; state.openConv = null; render(); return; }
   const listTab = e.target.closest('.list-tabs [data-tab]'); if(listTab){ state.listTab = listTab.dataset.tab; render(); return; }
-  const ack = e.target.closest('[data-ack]'); if(ack){ const c=conv(+ack.dataset.ack); c.reassignedFrom=null; c.reassignedBy=null; render(); return; }
+  const ack = e.target.closest('[data-ack]'); if(ack){ const c=conv(+ack.dataset.ack); c.reassignedFrom=null; c.reassignedBy=null; c.referredFrom=null; render(); return; }
   const res = e.target.closest('[data-resolve]'); if(res){ resolveConv(+res.dataset.resolve); return; }
   const rea = e.target.closest('[data-reassign]'); if(rea){ openReassign(+rea.dataset.reassign, rea); return; }
   if(e.target.closest('[data-close]')){ state.openConv = null; render(); return; }
