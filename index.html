@@ -326,9 +326,21 @@ const NUMBERS = [
      {role:'Hiring Contact', route:'Career Services Group'}]}},
   {id:'finance',     label:'Finance',     number:'225-397-7126', kind:'Dedicated', desc:'All billing & payment questions.',    tree:{type:'dedicated', route:'Finance Group'}},
   {id:'collections', label:'Collections', number:'225-238-1943', kind:'Dedicated', desc:'Past-due & collections outreach.',     tree:{type:'dedicated', route:'Collections Group'}},
-  {id:'compliance',  label:'Compliance',  number:'TBD',          kind:'Dedicated', desc:'Governing-agency & accreditation reps. (Inferred 6th line — confirm number & flow.)', tree:{type:'dedicated', route:'Compliance Group'}},
+  {id:'compliance',  label:'Compliance',  number:'225-480-0033', kind:'Dedicated', desc:'Governing-agency & accreditation reps.', tree:{type:'dedicated', route:'Compliance Group'}},
 ];
 const numberById = id => NUMBERS.find(n => n.id === id);
+
+// Approach A: which groups operate on each line (valid reassign targets); off-line groups = "Refer"
+const LINE_GROUPS = {
+  main:        ['Setter Group','Sales Manager','Student Support Group','Student Support Manager','Career Services Group','Logan Sutton (User Inbox)'],
+  instructors: ['Program Management Group','Recruiting + Hiring Group','CPR Group','Supplies Group','Marketing Group'],
+  b2b:         ['B2B Group','Career Services Group','Owen S (User Inbox)'],
+  finance:     ['Finance Group'],
+  collections: ['Collections Group'],
+  compliance:  ['Compliance Group'],
+};
+const groupHomeLine = {};
+Object.entries(LINE_GROUPS).forEach(([nid,gs]) => gs.forEach(g => { if(!(g in groupHomeLine)) groupHomeLine[g] = nid; }));
 
 /* ---------------------------------------------------------------------------
    STATE + HELPERS
@@ -505,15 +517,25 @@ function renderContext(c){
 function openReassign(convId, anchor){
   const c = conv(convId);
   const sel = document.createElement('select');
-  sel.innerHTML = `<option value="">Reassign to…</option>` +
-    Object.keys(GROUPS).map(g=>`<option value="${g}" ${c.subscribed.includes(g)?'disabled':''}>${g}</option>`).join('');
+  const same = (LINE_GROUPS[c.number]||[]).filter(g=>!c.subscribed.includes(g));
+  const others = Object.keys(GROUPS).filter(g=>!(LINE_GROUPS[c.number]||[]).includes(g) && !c.subscribed.includes(g));
+  const opt = (g,p)=>`<option value="${p}:${g}">${g}</option>`;
+  sel.innerHTML = `<option value="">Reassign or refer…</option>`
+    + `<optgroup label="Reassign — same line">${same.map(g=>opt(g,'re')).join('') || '<option disabled>(no other group on this line)</option>'}</optgroup>`
+    + `<optgroup label="Refer to another team — opens on their line">${others.map(g=>opt(g,'rf')).join('')}</optgroup>`;
   anchor.replaceWith(sel); sel.focus();
   sel.onchange = () => {
     if(!sel.value) return;
-    const old = c.subscribed.join(', ');
-    c.reassignedFrom = old; c.reassignedBy = persona(state.personaId).name;
-    c.subscribed = [sel.value];
-    state.flash = `Reassigned ${c.who} → ${sel.value}. Previous subscription (${old}) auto-removed.`;
+    const act = sel.value.slice(0,2), g = sel.value.slice(3);
+    if(act==='re'){
+      const old = c.subscribed.join(', ');
+      c.reassignedFrom = old; c.reassignedBy = persona(state.personaId).name;
+      c.subscribed = [g];
+      state.flash = `Reassigned ${c.who} → ${g}. Previous subscription (${old}) auto-removed.`;
+    } else {
+      const ln = numberById(groupHomeLine[g]);
+      state.flash = `Referred ${c.who} to ${g} — a new conversation opens on ${ln?`${ln.label} (${ln.number})`:'their line'}; this thread stays in ${c.subscribed.join(', ')}.`;
+    }
     render();
   };
   sel.onblur = () => render(); // dismissing without a choice restores the button
@@ -544,16 +566,16 @@ function renderSubs(){
       <li><b>On reassignment</b> — subscribing a new group/person removes the previous one (try the <b>⇄ Reassign</b> icon in a thread header).</li>
       <li><b>On role change</b> — if derived roles change, the conversation re-routes; the no-longer-matching group is dropped.</li>
       <li><b>On owner change</b> — owner-routed conversations follow the owner; the prior owner's personal inbox unsubscribes.</li>
-      <li><b>On resolve</b> — resolving clears active subscriptions (history stays on the record).</li>
-    </ul></div>
-  <div class="card"><h3>③ Reassignment</h3>
+    </ul>
+    ${note(`<b>Resolve does not change subscriptions.</b> Resolving is a status only — the conversation stays subscribed to its group and remains searchable in that inbox's <b>Resolved</b> tab.`, true)}</div>
+  <div class="card"><h3>③ Reassignment &amp; referral</h3>
     <p class="sub">Manual override of the automatic routing.</p>
     <ul class="rules">
-      <li>Any team member can reassign a conversation to a different <b>group</b> or <b>person</b>.</li>
-      <li>One step: subscribe the new target, auto-unsubscribe the old one (rule ② above).</li>
+      <li><b>Reassign</b> (same line): move a conversation to another group/person that works the <b>same inbound line</b>. One step — subscribe the new target, auto-unsubscribe the old (rule ②).</li>
+      <li><b>Refer</b> (different line): to involve a team on another line (e.g., Finance), the system opens a conversation on <b>that team's line</b> — they reply from their own number; this thread stays put.</li>
       <li>Reassigning to a <b>person</b> uses that person's User Inbox — a "group of one."</li>
     </ul>
-    ${note(`Reassignment is a subscription change, never a copy — there's always exactly one set of subscribers responsible, so messages don't get worked twice or dropped between teams.`)}</div>
+    ${note(`A past reassignment is <b>not sticky</b>: routing is recomputed for every inbound message from (line + role), so a future text to a line always routes by that line's rules — never to a team pulled in once. Try the <b>⇄</b> control in a thread header — same-line groups appear under "Reassign," other teams under "Refer."`, true)}</div>
   </div>`;
 }
 
@@ -565,7 +587,7 @@ function renderRouting(){
   return `<div class="narrow">
   <h2 class="sec">6 textable numbers <span style="color:var(--muted);font-weight:400;font-size:14px">(down from 23)</span></h2>
   <p class="lead">Three lines map to an <b>entity type</b> and route by role; three are <b>dedicated functions</b> (Finance, Collections, Compliance) with their own number. Select a card for its routing, or use the simulator.</p>
-  ${note(`Consolidating to 6 numbers means routing does the work the extra numbers used to — that's why role-based auto-subscription matters. <b>To confirm with the team:</b> Compliance's number &amp; flow; whether Supply POC and Marketing POC ride the Instructor line; and that manager inboxes co-subscribe alongside their team group.`)}
+  ${note(`Consolidating to 6 numbers means routing does the work the extra numbers used to — that's why role-based auto-subscription matters. <b>Confirmed:</b> Compliance line is 225-480-0033; managers (Sales Manager, Student Support Manager) co-subscribe alongside their team; and the inbound line is the disambiguator when a role maps to several groups. <b>Still open:</b> whether Supply POC &amp; Marketing POC ride this Instructor line.`)}
   <div class="num-grid">${cards}</div>
   <div class="card"><h3>${esc(open.label)} · ${esc(open.number)}</h3><p class="sub">Routing logic${open.tree.type==='entity'?' — evaluated top to bottom':''}.</p>${renderTree(open.tree)}</div>
   <div class="card"><h3>Simulate an inbound text</h3><p class="sub">Walk a hypothetical text through routing to see which group gets auto-subscribed.</p>${renderSim()}</div>
