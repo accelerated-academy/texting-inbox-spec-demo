@@ -180,6 +180,28 @@
   .seg2 button{font:inherit;font-size:13px;font-weight:600;border:none;background:#fff;color:var(--muted);padding:7px 14px;cursor:pointer}
   .seg2 button.active{background:var(--teal);color:#fff}
   .sim select{width:100%}
+
+  /* Manage Groups */
+  .mg-shell{display:grid;grid-template-columns:280px 1fr;gap:14px;align-items:start;margin-top:6px}
+  .mg-list{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:8px;align-self:start}
+  .mg-item{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13.5px;color:#3a3f52}
+  .mg-item:hover{background:#eef1f6}
+  .mg-item.active{background:var(--brand-soft);color:var(--brand-ink);font-weight:700}
+  .mg-item .gdot{width:9px;height:9px;border-radius:50%;flex:none}
+  .mg-item .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mg-item .ct{font-size:11px;color:var(--muted);background:#eef0f6;border-radius:999px;padding:1px 7px}
+  .mg-new{margin-top:8px;border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:6px}
+  .mg-field{margin-bottom:14px}
+  .mg-field label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:5px}
+  .mg-members{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+  .member{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;background:#eef0f6;color:#3a3f52;padding:4px 4px 4px 9px;border-radius:7px}
+  .member button{border:none;background:none;color:#9aa0b4;cursor:pointer;font-size:12px;line-height:1;padding:0 2px}
+  .member button:hover{color:#e23b3b}
+  input.mini{font:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;width:100%}
+  select.mini{font:inherit;font-size:13px;padding:8px 28px 8px 10px;border:1px solid var(--line);border-radius:8px;width:100%;-webkit-appearance:none;appearance:none;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2362667a' stroke-width='1.6' fill='none'/%3E%3C/svg%3E") no-repeat right 10px center}
+  .mini-btn{font:inherit;font-size:13px;font-weight:600;color:#fff;background:var(--brand);border:none;border-radius:8px;padding:8px 13px;cursor:pointer;white-space:nowrap}
+  .mg-row{display:flex;gap:8px}
+  .danger{font:inherit;color:#c0392b;background:#fdecea;border:1px solid #f5c6cb;border-radius:8px;font-weight:600;font-size:12px;padding:6px 10px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -197,6 +219,7 @@
   <nav class="tabs" id="tabs">
     <button data-view="inbox" class="active">Inbox</button>
     <button data-view="subs">Subscriptions &amp; Roles</button>
+    <button data-view="groups">Manage Groups</button>
     <button data-view="routing">Number Routing</button>
   </nav>
   <main id="app"></main>
@@ -341,11 +364,23 @@ const LINE_GROUPS = {
 const groupHomeLine = {};
 Object.entries(LINE_GROUPS).forEach(([nid,gs]) => gs.forEach(g => { if(!(g in groupHomeLine)) groupHomeLine[g] = nid; }));
 
+// Editable group-management model (seeded from SERVICING); drives the Subscriptions roster + Manage Groups
+const MGROUPS = [];
+SERVICING.forEach(s => {
+  if(s.group === 'User Inbox'){
+    const ln = /partner/i.test(s.role) ? 'b2b' : 'main';
+    s.people.forEach(p => MGROUPS.push({name:`${p} (User Inbox)`, role:s.role, line:ln, members:[p], kind:'user'}));
+  } else {
+    MGROUPS.push({name:s.group, role:s.role, line:groupHomeLine[s.group] || 'main', members:s.people.slice(), kind:'team'});
+  }
+});
+const mgroup = name => MGROUPS.find(g => g.name === name);
+
 /* ---------------------------------------------------------------------------
    STATE + HELPERS
 --------------------------------------------------------------------------- */
 const state = {view:'inbox', personaId:'p1', specNotes:true,
-  inbox:'Setter Group', listTab:'priority', openConv:null,
+  inbox:'Setter Group', listTab:'priority', openConv:null, selGroup:'Setter Group',
   routingOpen:'main', sim:{numberId:'main', recordFound:'yes', role:null, ownerIdx:0}, flash:null};
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -364,7 +399,7 @@ const isPriority = (c, pid) => lastSenderId(c)===pid || !attended(c) || !c.owner
 --------------------------------------------------------------------------- */
 function render(){
   const app = document.getElementById('app');
-  app.innerHTML = state.view==='inbox' ? renderInbox() : state.view==='subs' ? renderSubs() : renderRouting();
+  app.innerHTML = state.view==='inbox' ? renderInbox() : state.view==='subs' ? renderSubs() : state.view==='groups' ? renderGroups() : renderRouting();
   const ps = document.getElementById('persona'); if(ps) ps.value = state.personaId;
   document.querySelectorAll('#tabs>button').forEach(b => b.classList.toggle('active', b.dataset.view===state.view));
   if(state.view==='inbox'){ const t = app.querySelector('[data-thread]'); if(t) t.scrollTop = t.scrollHeight; }
@@ -569,7 +604,7 @@ function sendMessage(){
 
 /* ---- SUBSCRIPTIONS & ROLES ---- */
 function renderSubs(){
-  const servRows = SERVICING.map(s=>`<tr><td>${chip(s.group)}</td><td>${esc(s.role)}</td><td>${s.people.map(p=>`<span class="badge">${esc(p)}</span>`).join(' ')}</td></tr>`).join('');
+  const servRows = MGROUPS.map(g=>`<tr><td>${chip(g.name)}</td><td>${esc(g.role)}</td><td>${g.members.map(p=>`<span class="badge">${esc(p)}</span>`).join(' ')||'<span class="badge">—</span>'}</td></tr>`).join('');
   const table = `<table><thead><tr><th>Group / inbox</th><th>Services role</th><th>Subscribed people</th></tr></thead><tbody>${servRows}</tbody></table>`;
 
   return `<div class="narrow">
@@ -577,7 +612,7 @@ function renderSubs(){
   <p class="lead">An Associate record's <b>roles</b> are auto-assigned from its child records. When a text arrives, the platform reads the inbound line + the record's role(s) + owner, then <b>auto-subscribes</b> the right group. Anyone in that group sees the conversation; everyone else does not.</p>
   ${note(`Roles are <b>derived, not hand-set</b> — they recompute when child records change, so subscriptions must recompute too. A role change can move a live conversation from one group's inbox to another's.`)}
   <div class="card"><h3>① Group roster — who services which role</h3>
-    <p class="sub">AA's real groups and members. A "User Inbox" is one person's personal inbox (a group of one).</p>${table}
+    <p class="sub">The live roster — edit it in the <b>Manage Groups</b> tab. A "User Inbox" is one person's personal inbox (a group of one).</p>${table}
     ${note(`Some roles map to <b>several</b> groups (e.g., <i>Students or Alumni</i> → Student Support, Career Services, Finance, Collections). When that happens, the <b>inbound line</b> decides which group is subscribed — see Number Routing. Manager inboxes (Sales Manager, Student Support Manager) are co-subscribed alongside their team's group.`, true)}</div>
   <div class="card"><h3>② Auto-unsubscribe</h3>
     <p class="sub">When a subscription should drop without anyone doing it manually.</p>
@@ -652,6 +687,53 @@ function renderSim(){
     <div class="x">${esc(r.why)} Everyone in that group sees it in their inbox.</div></div></div>`;
 }
 
+/* ---- MANAGE GROUPS ---- */
+function renderGroups(){
+  if(!mgroup(state.selGroup)) state.selGroup = MGROUPS[0] ? MGROUPS[0].name : null;
+  const items = MGROUPS.map(g => `<div class="mg-item ${state.selGroup===g.name?'active':''}" data-group="${esc(g.name)}">
+    <span class="gdot" style="background:${groupColor(g.name)}"></span><span class="nm">${esc(g.name)}</span><span class="ct">${g.members.length}</span></div>`).join('');
+  const newForm = `<div class="mg-new">
+    <input class="mini" data-newgroup placeholder="New group name…">
+    <select class="mini" data-newline>${NUMBERS.map(n=>`<option value="${n.id}">${esc(n.label)}</option>`).join('')}</select>
+    <button class="mini-btn" data-creategroup>＋ Create group</button></div>`;
+  const g = mgroup(state.selGroup);
+  const flash = state.flash ? `<div class="flash">✓ ${esc(state.flash)}</div>` : '';
+  return `<div class="narrow">
+    <h2 class="sec">Manage groups</h2>
+    <p class="lead">Create or remove groups, set which <b>line</b> a group works and which <b>role</b> it services, and manage <b>membership</b>. This roster drives auto-subscription and inbox visibility.</p>
+    ${note(`This is the admin surface behind the <b>Subscriptions &amp; Roles</b> roster. Changing a group's members changes who sees that group's conversations; changing its line or role changes what auto-subscribes to it.`)}
+    ${flash}
+    <div class="mg-shell">
+      <div class="mg-list">${items}${newForm}</div>
+      ${g ? renderGroupDetail(g) : `<div class="card">No group selected.</div>`}
+    </div>
+  </div>`;
+}
+function renderGroupDetail(g){
+  const members = g.members.length
+    ? g.members.map(m=>`<span class="member">${esc(m)}<button data-rmmember="${esc(m)}" title="Remove">✕</button></span>`).join('')
+    : `<span class="ct" style="color:var(--muted)">No members yet.</span>`;
+  return `<div class="card">
+    <div style="display:flex;align-items:center;gap:9px;margin-bottom:14px">
+      <span style="width:12px;height:12px;border-radius:50%;background:${groupColor(g.name)};flex:none"></span>
+      <h3 style="margin:0;flex:1">${esc(g.name)} ${g.kind==='user'?'<span class="badge">User Inbox</span>':''}</h3>
+      <button class="danger" data-delgroup="${esc(g.name)}">Delete</button>
+    </div>
+    <div class="mg-field"><label>Inbound line</label>
+      <select class="mini" data-setline>${NUMBERS.map(n=>`<option value="${n.id}" ${n.id===g.line?'selected':''}>${esc(n.label)} · ${esc(n.number)}</option>`).join('')}</select></div>
+    <div class="mg-field"><label>Services role (auto-subscribe)</label>
+      <input class="mini" data-setrole value="${esc(g.role)}"></div>
+    <div class="mg-field"><label>Members · ${g.members.length}</label>
+      <div class="mg-members">${members}</div>
+      <div class="mg-row"><input class="mini" data-newmember placeholder="Add a person…"><button class="mini-btn" data-addmember>Add</button></div>
+    </div>
+  </div>`;
+}
+function addMember(){ const g=mgroup(state.selGroup); const i=document.querySelector('[data-newmember]'); const v=i&&i.value.trim(); if(g&&v&&!g.members.includes(v)){ g.members.push(v); state.flash=`Added ${v} to ${g.name}.`; render(); } }
+function removeMember(name){ const g=mgroup(state.selGroup); if(g){ g.members=g.members.filter(m=>m!==name); state.flash=`Removed ${name} from ${g.name}.`; render(); } }
+function createGroup(){ const ni=document.querySelector('[data-newgroup]'), li=document.querySelector('[data-newline]'); const name=ni&&ni.value.trim(); if(name&&!mgroup(name)){ MGROUPS.push({name, role:'(set role)', line:li?li.value:'main', members:[], kind:'team'}); state.selGroup=name; state.flash=`Created group “${name}”.`; render(); } }
+function deleteGroup(name){ const i=MGROUPS.findIndex(g=>g.name===name); if(i>=0){ MGROUPS.splice(i,1); state.selGroup=MGROUPS[0]?MGROUPS[0].name:null; state.flash=`Deleted group “${name}”.`; render(); } }
+
 /* ---------------------------------------------------------------------------
    WIRING
 --------------------------------------------------------------------------- */
@@ -665,6 +747,11 @@ document.getElementById('tabs').onclick = e => { const b = e.target.closest('but
 
 const app = document.getElementById('app');
 app.addEventListener('click', e => {
+  const grp = e.target.closest('[data-group]'); if(grp){ state.selGroup = grp.dataset.group; state.flash = null; render(); return; }
+  if(e.target.closest('[data-creategroup]')){ createGroup(); return; }
+  if(e.target.closest('[data-addmember]')){ addMember(); return; }
+  const rmm = e.target.closest('[data-rmmember]'); if(rmm){ removeMember(rmm.dataset.rmmember); return; }
+  const delg = e.target.closest('[data-delgroup]'); if(delg){ deleteGroup(delg.dataset.delgroup); return; }
   const inbox = e.target.closest('[data-inbox]'); if(inbox){ state.inbox = inbox.dataset.inbox; state.openConv = null; render(); return; }
   const listTab = e.target.closest('.list-tabs [data-tab]'); if(listTab){ state.listTab = listTab.dataset.tab; render(); return; }
   const ack = e.target.closest('[data-ack]'); if(ack){ const c=conv(+ack.dataset.ack); c.reassignedFrom=null; c.reassignedBy=null; c.referredFrom=null; render(); return; }
@@ -681,6 +768,8 @@ app.addEventListener('input', e => {
 });
 app.addEventListener('change', e => {
   const t = e.target;
+  if(t.hasAttribute('data-setline')){ const g=mgroup(state.selGroup); if(g){ g.line=t.value; state.flash=`Set ${g.name} line → ${numberById(t.value).label}.`; render(); } return; }
+  if(t.hasAttribute('data-setrole')){ const g=mgroup(state.selGroup); if(g){ g.role=t.value; render(); } return; }
   if(t.dataset.sim==='number'){ state.sim.numberId = t.value; state.routingOpen = t.value; state.sim.role = null; state.sim.ownerIdx = 0; render(); }
   else if(t.dataset.sim==='role'){ state.sim.role = t.value; state.sim.ownerIdx = 0; render(); }
   else if(t.dataset.sim==='owner'){ state.sim.ownerIdx = +t.value; render(); }
